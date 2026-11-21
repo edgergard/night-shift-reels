@@ -2,7 +2,7 @@ import { Container, Graphics, Sprite, type GraphicsContext, type Texture } from 
 import { mod, symbolAt, type Strip } from '../game/reels';
 import { reelFrame } from '../game/spinMath';
 import { SYMBOL_IDS, type SymbolId } from '../game/symbols';
-import { GLOW_TINT, IDLE } from './theme';
+import { SYMBOL_TINT, IDLE } from './theme';
 
 /** Rows relative to the middle line. ±2 are buffer rows hidden by the mask. */
 const ROWS = [-2, -1, 0, 1, 2] as const;
@@ -117,7 +117,7 @@ export class ReelView extends Container {
       const id = symbolAt(this.strip, base + row);
       if (id !== slot.shown) {
         for (const s of SYMBOL_IDS) slot.art[s].visible = s === id;
-        slot.glow.tint = GLOW_TINT[id];
+        slot.glow.tint = SYMBOL_TINT[id];
         slot.shown = id;
       }
     });

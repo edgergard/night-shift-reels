@@ -1,33 +1,34 @@
 import type { SymbolId } from '../game/symbols';
 
-/** Pixi-side colour tokens (the CSS tokens live in style.css :root). */
+/** Pixi-side colour tokens for the "Neon Night City" look (CSS tokens live in style.css :root). */
 export const PIXI_COLORS = {
-  window: 0x04061a,
-  glow: 0x8f8bff,
-  neonCyan: 0x6ef3ff,
-  gold: 0xffd36e,
-  gold2: 0xffb84d,
-  goldPale: 0xfff1b8,
+  plate: 0x0b0a11, // sign backplate
+  cell: 0x100e19, // reel window; also the occluder fill inside tube symbols
+  magenta: 0xff2e88,
+  magentaHot: 0xff7ab6,
+  cyan: 0x19e3ff,
+  cyanHot: 0xa8f6ff,
+  amber: 0xffc43d,
   white: 0xffffff,
   shadow: 0x000000,
 } as const;
 
-/** Inner-light colour behind each symbol. */
-export const GLOW_TINT: Readonly<Record<SymbolId, number>> = {
-  moon: 0xffc14d,
-  comet: 0x5ad8ff,
-  planet: 0x9b7bff,
-  star: 0xffe27a,
-  rocket: 0xff6f91,
+/** Tube colour of each symbol (also tints its soft halo). */
+export const SYMBOL_TINT: Readonly<Record<SymbolId, number>> = {
+  moon: 0x6fe7ff, // icier than the cyan payline so the two never merge
+  comet: 0xff7ab6,
+  planet: 0xb77bff,
+  star: 0xffc43d,
+  rocket: 0x39ffb6,
 };
 
-export const SPARK_TINTS = [0xffd36e, 0xffffff, 0xfff1b8] as const;
+export const SPARK_TINTS = [0xff7ab6, 0xa8f6ff, 0xffffff] as const;
 
 /** Resting alpha values for ambient elements. */
 export const IDLE = {
-  paylineIdle: 0.18,
-  paylineIdleMax: 0.3,
-  glowMin: 0.55,
-  glowMax: 0.9,
-  slotGlow: 0.32,
+  paylineIdle: 0.75,
+  paylineIdleMax: 0.95,
+  glowMin: 0.7,
+  glowMax: 1,
+  slotGlow: 0.16,
 } as const;

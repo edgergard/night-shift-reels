@@ -1,11 +1,17 @@
-import '@fontsource-variable/sora';
-import '@fontsource-variable/inter';
+import '@fontsource-variable/big-shoulders-display';
+import '@fontsource-variable/inter-tight';
+import '@fontsource-variable/jetbrains-mono';
 import './style.css';
 import { RoundController, type GameState } from './game/controller';
 import type { Round } from './game/round';
 import { SYMBOL_NAMES } from './game/symbols';
 import { gsap, SplitText } from './view/gsapSetup';
+import { skylineSvg } from './view/skyline';
 import { SlotScene } from './view/SlotScene';
+
+// Decorative backdrop first: it does not depend on the renderer.
+const city = document.getElementById('city');
+if (city) city.innerHTML = skylineSvg();
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -43,6 +49,7 @@ try {
   throw error;
 }
 scene.setMotion(!reducedMotionQuery.matches);
+scene.powerOn(); // neon sign flickers on (no-op with reduced motion)
 reducedMotionQuery.addEventListener('change', (event) => {
   scene.setMotion(!event.matches);
   if (event.matches) hideBanner();

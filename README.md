@@ -8,17 +8,20 @@ A compact three-reel browser game with a night-sky theme. Press **Spin**: the re
 - **Show a win (demo)**: when the game is idle, plays a round that is guaranteed to win and is clearly labelled as a demo, so the win animation can be seen on the first try.
 - All rounds are free. Nothing is stored, so a page reload starts fresh.
 
-Stack: TypeScript (strict), Vite, PixiJS 8 (scene and symbols), GSAP 3 (reel motion and the win animation, using the CustomEase, Physics2D and SplitText plugins), Vitest (logic). Fonts are Sora and Inter, self-hosted via `@fontsource-variable`.
+Stack: TypeScript (strict), Vite, PixiJS 8 (scene and symbols), GSAP 3 (reel motion and the win animation, using the CustomEase, Physics2D and SplitText plugins), Vitest (logic). Fonts are Big Shoulders Display, Inter Tight and JetBrains Mono, self-hosted via `@fontsource-variable`.
 
-## Look and motion ("Aurora Glass")
+## Look and motion ("Neon Night City")
 
-- **Sky:** CSS-only drifting aurora blobs, two twinkling star layers and an occasional shooting star. These animate transform and opacity only, so they stay on the compositor.
-- **Board:** a translucent slab with a cyan-to-violet neon edge, a breathing outer glow, and a soft shadow blurred once and cached with `cacheAsTexture`. Depth fades make the reels read like a cylinder.
-- **Symbols:** five original vector symbols with `FillGradient` fills and an additive glow sprite behind each one, tinted per symbol. The crescent is drawn as an explicit two-arc path.
-- **Spin:** a wind-up, then acceleration and cruise. Symbols stretch with reel speed. Each reel brakes with a custom detent ease (`reelSettle`) that overshoots slightly. Landing gives a window flash, a board nudge and a squash. If the first two symbols match, the third reel teases: it spins longer and gets a gold rim.
-- **Win:** the payline flashes, then stays highlighted. The matching symbols pop, a gold glow blooms behind them and 72 pooled sparks fall with Physics2D gravity. A light sweep runs along the line, and an `aria-hidden` SplitText "Win!" banner appears. Afterwards a calm breathing loop runs until the next spin.
-- **UI:** a near-opaque "glass" HUD card, a gradient Spin button with a sheen and a few invite pulses, solid disabled states that keep AA contrast, and an indeterminate progress bar on Spin while spinning.
-- **Reduced motion:** all of the above is off. Rounds glide to their stops in about 0.3 s, and a win only lights the line. Turning the OS setting on mid-round skips the spin or settles the win immediately.
+"Night shift" taken literally: a rainy city at 3 am, and the reels are a neon sign.
+
+- **Backdrop:** a seeded SVG skyline (`src/view/skyline.ts`) with lit windows, a few of which switch on and off on slow cycles, plus a blinking antenna and wet-street reflections. It is plain DOM + CSS, so it never touches the game canvas, and the street shimmer moves with `transform` only.
+- **Board:** a dark sign backplate with a magenta outer tube, mounting screws and cyan payline rails. Every tube is the same shape stroked several times: two wide faint passes (glow), the coloured tube and a thin white core. That "baked" glow is plain geometry, with no filters, redrawn only on resize. A soft shadow is blurred once and cached with `cacheAsTexture`.
+- **Symbols:** five original neon-tube symbols. Their centre-lines are SVG path data (`GraphicsPath`) or sampled ellipse arcs, drawn once into a shared `GraphicsContext`. Opaque occluders hide the planet ring's back half and the comet's tails behind its head.
+- **Power-on:** the sign flickers on at load with two short stepped dips (`flicker()` keyframes, `ease: 'steps(1)'` on every keyframe).
+- **Spin:** a wind-up, then acceleration and cruise. Symbols stretch with reel speed. Each reel brakes with a custom detent ease (`reelSettle`) that overshoots slightly. Landing gives a cyan window flash, a board nudge and a squash. If the first two symbols match, the third reel teases: it spins longer inside an amber tube.
+- **Win:** the payline rails surge brighter, the matching symbols pop, sparks in neon colours fall with Physics2D gravity and a light sweeps along the line. The sign "buzzes" (its halo stutters twice) and an `aria-hidden` SplitText "WIN!" banner glows in. Afterwards a calm breathing loop runs until the next spin. Flash counts stay within WCAG 2.3.1 (at most 3 per second).
+- **UI:** a dark HUD panel with a status bar that lights cyan while spinning and magenta on a win, a magenta Spin button that hums a few times when it becomes available, cyan-outlined secondary buttons, and solid disabled states that keep AA contrast.
+- **Reduced motion:** every decorative animation is off (flicker, shimmer, window blinks, hum, banner, win burst). Rounds glide to their stops in about 0.3 s and a win only lights the line. Turning the OS setting on mid-round skips the spin or settles the win immediately.
 
 ## Run it
 
@@ -45,7 +48,8 @@ src/
     spinMath.ts         spinTarget(), reelFrame(): the maths GSAP relies on
     *.test.ts           Vitest suites
   view/
-    symbolArt.ts        five original vector symbols (one GraphicsContext each)
+    symbolArt.ts        five original neon-tube symbols (one GraphicsContext each)
+    skyline.ts          seeded SVG skyline for the page background (DOM, not Pixi)
     ReelView.ts         one reel, rendered from a single number (+ speed stretch)
     SlotScene.ts        Pixi Application, layout, GSAP timelines, Skip, landing/win FX
     WinFx.ts            pooled sparks, glow bloom and line sweep for wins
