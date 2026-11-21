@@ -1,5 +1,7 @@
 # Night Shift Reels
 
+**Live demo:** https://edgergard.github.io/night-shift-reels/
+
 A compact three-reel browser game with a night-sky theme. Press **Spin**: the reels speed up, stop one after another, and three matching symbols on the **middle row** win. A win plays a short animation on the matching symbols, highlights the line and shows the result as text.
 
 - **Skip animation**: while the reels spin, jumps straight to the final symbols. The result is the same.
@@ -123,4 +125,4 @@ Because rendering reads `stripPosition` and the current `cellSize` every frame, 
 3. On GitHub, open **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
 4. The workflow `.github/workflows/deploy.yml` runs typecheck, tests and build on every push to `main`, then publishes `dist/`. The URL appears in the run summary and under Settings → Pages.
 
-Live demo: _not published yet._
+Live demo: https://edgergard.github.io/night-shift-reels/
