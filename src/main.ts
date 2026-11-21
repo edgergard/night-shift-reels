@@ -23,10 +23,25 @@ const demoBtn = byId<HTMLButtonElement>('demo');
 const banner = byId<HTMLDivElement>('win-banner');
 
 const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-const motion = (): { reducedMotion: boolean } => ({ reducedMotion: reducedMotionQuery.matches });
+
+/** index.html adds `intro` to <html> before first paint so the entrance can start from hidden. */
+const INTRO_TARGETS = ['.header', '.stage', '.hud'];
+const endIntroHold = (): void => document.documentElement.classList.remove('intro');
 
 const game = new RoundController();
-const scene = await SlotScene.create(stage);
+
+let scene: SlotScene;
+try {
+  scene = await SlotScene.create(stage);
+} catch (error) {
+  // No renderer (WebGL blocked, GPU blocklist…): say so instead of leaving dead buttons.
+  endIntroHold();
+  statusTitle.textContent = 'Graphics unavailable';
+  statusDetail.textContent =
+    'This browser could not start the game renderer. Try another browser or enable hardware acceleration.';
+  for (const button of [spinBtn, skipBtn, demoBtn]) button.disabled = true;
+  throw error;
+}
 scene.setMotion(!reducedMotionQuery.matches);
 reducedMotionQuery.addEventListener('change', (event) => {
   scene.setMotion(!event.matches);
@@ -71,7 +86,7 @@ function startRound(demo: boolean): void {
   if (!round) return; // already spinning — the controller refuses, nothing to do
   hideBanner();
   // The callback is bound to THIS round's id; if it fires late, finish() ignores it.
-  scene.spin(round, motion(), (by) => game.finish(round.id, by));
+  scene.spin(round, (by) => game.finish(round.id, by));
 }
 
 function describe(round: Round): { title: string; detail: string } {
@@ -100,10 +115,14 @@ function setStatus(title: string, detail: string): void {
   }
 }
 
-/** Moves focus along with the action so keyboard users never land on a disabled button. */
-function handOffFocus(from: HTMLButtonElement, to: HTMLButtonElement): void {
-  if (document.activeElement === from) to.focus();
-}
+/**
+ * Focus follows the action so keyboard users never get stranded on a disabled
+ * button: Spin/Demo → Skip while spinning, then back to Spin for the result.
+ * `controlsHadFocus` remembers that focus was in the controls even if the
+ * browser already dropped it to <body> when a focused button was disabled.
+ */
+let controlsHadFocus = false;
+const isControl = (el: Element | null): boolean => el === spinBtn || el === demoBtn || el === skipBtn;
 
 function render(state: GameState): void {
   stage.dataset['phase'] = state.phase;
@@ -115,21 +134,24 @@ function render(state: GameState): void {
   skipBtn.disabled = !spinning;
 
   if (spinning) {
+    controlsHadFocus = isControl(wasFocused);
     // With reduced motion the round is over in ~0.3 s, so moving focus to Skip
     // and straight back would only make screen readers stutter.
-    if (!reducedMotionQuery.matches && (wasFocused === spinBtn || wasFocused === demoBtn)) skipBtn.focus();
+    if (controlsHadFocus && !reducedMotionQuery.matches) skipBtn.focus();
     status.dataset['outcome'] = '';
     setStatus('Spinning…', state.round.demo ? 'Demo round: the result is a guaranteed win.' : 'Reels are spinning.');
     return;
   }
 
-  handOffFocus(skipBtn, spinBtn);
+  const focusNow = document.activeElement;
+  if (controlsHadFocus && (isControl(focusNow) || focusNow === document.body || focusNow === null)) spinBtn.focus();
+  controlsHadFocus = false;
   if (state.phase === 'result') {
     const text = describe(state.round);
     status.dataset['outcome'] = state.round.outcome.kind;
     setStatus(text.title, text.detail);
     if (state.round.outcome.kind === 'win') {
-      scene.showWin(motion());
+      scene.showWin();
       if (!reducedMotionQuery.matches) showBanner(text.title);
     }
   }
@@ -151,16 +173,16 @@ document.addEventListener('keydown', (event) => {
   else startRound(false);
 });
 
-// Entrance: opacity/transform only, cleared afterwards so nothing stays hidden.
-if (!reducedMotionQuery.matches) {
-  gsap.from(['.header', '.stage', '.hud'], {
-    opacity: 0,
-    y: 16,
-    duration: 0.5,
-    stagger: 0.08,
-    ease: 'power3.out',
-    clearProps: 'transform,opacity',
-  });
+// Entrance: the elements have been hidden since first paint (html.intro), so there is
+// no flash of content while Pixi starts. fromTo writes inline opacity:0 immediately,
+// then the CSS hold is lifted; clearProps removes the inline styles at the end.
+if (document.documentElement.classList.contains('intro')) {
+  gsap.fromTo(
+    INTRO_TARGETS,
+    { opacity: 0, y: 16 },
+    { opacity: 1, y: 0, duration: 0.5, stagger: 0.08, ease: 'power3.out', clearProps: 'transform,opacity' },
+  );
+  endIntroHold();
 }
 
 // Dev-only handle for poking at the state from the console; stripped from production builds.

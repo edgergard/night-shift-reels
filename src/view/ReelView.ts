@@ -94,8 +94,9 @@ export class ReelView extends Container {
   /** dtMs is passed only by the frame loop; layout() and snapTo() redraw without touching speed. */
   render(dtMs?: number): void {
     if (dtMs !== undefined) {
-      let distance = Math.abs(this.stripPosition - this.lastPos);
-      if (distance > 4) distance = 0; // a mod-wrap or snap jump, not real motion
+      // Every discontinuous jump goes through snapTo(), which syncs lastPos, so any
+      // remaining delta is real motion — even across a long (hitchy) frame.
+      const distance = Math.abs(this.stripPosition - this.lastPos);
       const target = this.motionFx ? Math.min(((distance / Math.max(dtMs, 1)) * 1000) / FULL_SPEED, 1) : 0;
       this.speed += (target - this.speed) * 0.3;
       if (this.speed < 0.001) this.speed = 0;

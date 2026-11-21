@@ -151,6 +151,11 @@ body {
   100% { opacity: 0; transform: translate(-40vw, 20vh) rotate(-27deg); }
 }
 
+/* Entrance hold: set by an inline script in index.html, lifted by main.ts. */
+html.intro .header,
+html.intro .stage,
+html.intro .hud { opacity: 0; }
+
 /* ───────────────────────── Layout (phone first) ───────────────────────── */
 .app {
   max-width: 560px;

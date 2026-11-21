@@ -10,10 +10,6 @@ import { createGlowTexture, createSparkTexture } from './textures';
 import { GLOW_TINT, IDLE, PIXI_COLORS } from './theme';
 import { WinFx, type BoardGeometry } from './WinFx';
 
-export interface MotionOptions {
-  readonly reducedMotion: boolean;
-}
-
 /** Symbols per second while cruising. */
 const CRUISE_SPEED = 22;
 /** Minimum travel of reel 0, and extra travel each later reel adds, in symbols. */
@@ -66,6 +62,8 @@ export class SlotScene {
 
   private geom: BoardGeometry = { cell: 100, pad: 14, boardW: 340, midY: 164 };
   private motionOn = true;
+  /** Something changed outside a running animation; draw on the next frame. */
+  private dirty = true;
   private ambient: gsap.core.Tween[] = [];
   private spinTimeline: gsap.core.Timeline | null = null;
   private winTimeline: gsap.core.Timeline | null = null;
@@ -113,6 +111,10 @@ export class SlotScene {
     // frame from the fresh stripPosition values. Pixi's own ticker is off
     // (autoStart: false), so the reels are never drawn from last frame's numbers.
     gsap.ticker.add((_time, deltaMs) => {
+      // With motion on, ambient tweens change something every frame. With reduced
+      // motion the board is static, so only draw while a spin runs or after a change.
+      if (!this.motionOn && !this.spinTimeline && !this.dirty) return;
+      this.dirty = false;
       this.reels.forEach((reel) => reel.render(deltaMs));
       app.render();
     });
@@ -135,8 +137,13 @@ export class SlotScene {
     return new SlotScene(app);
   }
 
+  private requestRender(): void {
+    this.dirty = true;
+  }
+
   /** Ambient idle motion on/off (prefers-reduced-motion). */
   setMotion(on: boolean): void {
+    this.requestRender();
     this.motionOn = on;
     this.reels.forEach((reel) => (reel.motionFx = on));
     this.ambient.forEach((t) => t.kill());
@@ -258,13 +265,15 @@ export class SlotScene {
 
     // Sparks/sweep hold old pixel positions; payline + icon win state survive (alpha/scale only).
     if (this.winTimeline || this.winLoop) this.winFx.stop();
+    this.requestRender();
   }
 
   /**
    * Animates the reels onto round.stops. `done` is called exactly once per
    * spin — by the timeline's onComplete or by skip(), whichever comes first.
    */
-  spin(round: Round, motion: MotionOptions, done: (by: FinishedBy) => void): void {
+  spin(round: Round, done: (by: FinishedBy) => void): void {
+    const reducedMotion = !this.motionOn; // single source of truth: setMotion()
     this.clearWin();
     this.resetSpinFx();
     this.spinTimeline?.kill();
@@ -273,9 +282,10 @@ export class SlotScene {
 
     const timeline = gsap.timeline({ onComplete: () => this.finishSpin('reels') });
     // Tease: if the first two middle symbols already match, the last reel spins longer.
-    const tease = !motion.reducedMotion && round.middleRow[0] === round.middleRow[1];
-    if (!motion.reducedMotion) {
-      gsap.fromTo(this.glowRing, { alpha: 1 }, { alpha: 0.6, duration: 0.5, ease: 'power2.out', overwrite: true });
+    const tease = !reducedMotion && round.middleRow[0] === round.middleRow[1];
+    if (!reducedMotion) {
+      // Charge pulse: dip and come back, so the idle glow is the same before and after a spin.
+      gsap.fromTo(this.glowRing, { alpha: 1 }, { alpha: 0.6, duration: 0.25, ease: 'power2.out', yoyo: true, repeat: 1, overwrite: true });
     }
     let previousTravel = 0;
 
@@ -285,7 +295,7 @@ export class SlotScene {
       const from = mod(Math.round(reel.stripPosition), n);
       reel.snapTo(from);
 
-      if (motion.reducedMotion) {
+      if (reducedMotion) {
         // No acceleration, no loops, no bounce: a short glide straight to the stop.
         const target = spinTarget(from, stop, n, 0);
         timeline.to(reel, { stripPosition: target, duration: 0.18, ease: 'power1.out' }, i * 0.06);
@@ -369,10 +379,11 @@ export class SlotScene {
     if (by === 'skip') this.resetSpinFx();
     else this.stopAnticipation();
     this.reels.forEach((reel, i) => reel.snapTo(active.round.stops[i] ?? 0));
+    this.requestRender();
     active.done(by);
   }
 
-  showWin(motion: MotionOptions): void {
+  showWin(): void {
     this.clearWin();
     const icons = this.reels.map((r) => r.middleIcon);
     const scales = icons.map((icon) => icon.scale);
@@ -380,8 +391,9 @@ export class SlotScene {
     const tl = gsap.timeline();
     this.winTimeline = tl;
 
-    if (motion.reducedMotion) {
+    if (!this.motionOn) {
       tl.set(this.paylineWin, { alpha: 1 }).set(glows, { alpha: 0.8 });
+      this.requestRender();
       return;
     }
 
@@ -409,6 +421,7 @@ export class SlotScene {
   }
 
   clearWin(): void {
+    this.requestRender();
     this.winTimeline?.kill();
     this.winTimeline = null;
     this.winLoop?.kill();

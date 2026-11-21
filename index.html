@@ -7,6 +7,10 @@
     <meta name="theme-color" content="#05061a" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <title>Night Shift Reels</title>
+    <script>
+      // Hide the UI from first paint so the entrance animation (main.ts) never flashes content.
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('intro');
+    </script>
   </head>
   <body>
     <div class="sky" aria-hidden="true">
