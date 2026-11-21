@@ -7,7 +7,7 @@ import { gsap } from './gsapSetup';
 import { ReelView } from './ReelView';
 import { createSymbolContexts } from './symbolArt';
 import { createGlowTexture, createSparkTexture } from './textures';
-import { GLOW_TINT, IDLE, PIXI_COLORS } from './theme';
+import { SYMBOL_TINT, IDLE, PIXI_COLORS } from './theme';
 import { WinFx, type BoardGeometry } from './WinFx';
 
 /** Symbols per second while cruising. */
@@ -30,10 +30,39 @@ const grad = (stops: [number, string][], x1: number, y1: number): FillGradient =
     colorStops: stops.map(([offset, color]) => ({ offset, color })),
     textureSpace: 'local',
   });
-const PANEL_GRAD = grad([[0, 'rgba(26,31,82,0.88)'], [1, 'rgba(10,12,42,0.92)']], 0, 1);
-const NEON_GRAD = grad([[0, '#6ef3ff'], [0.5, '#a77bff'], [1, '#6ef3ff']], 1, 1);
-const FADE_TOP = grad([[0, 'rgba(4,6,26,1)'], [1, 'rgba(4,6,26,0)']], 0, 1);
-const FADE_BOTTOM = grad([[0, 'rgba(4,6,26,0)'], [1, 'rgba(4,6,26,1)']], 0, 1);
+const FADE_TOP = grad([[0, 'rgba(16,14,25,1)'], [1, 'rgba(16,14,25,0)']], 0, 1);
+const FADE_BOTTOM = grad([[0, 'rgba(16,14,25,0)'], [1, 'rgba(16,14,25,1)']], 0, 1);
+
+/**
+ * Neon tube = the same shape stroked several times: two wide faint passes (glow),
+ * the coloured tube, then a thin white core. Sizes scale with the cell so the
+ * sign looks the same on a phone and a desktop. No filters involved.
+ */
+function tubePasses(cell: number, color: number): { width: number; color: number; alpha: number }[] {
+  return [
+    { width: cell * 0.16, color, alpha: 0.06 },
+    { width: cell * 0.075, color, alpha: 0.18 },
+    { width: Math.max(2.5, cell * 0.028), color, alpha: 1 },
+    { width: Math.max(1, cell * 0.009), color: PIXI_COLORS.white, alpha: 0.8 },
+  ];
+}
+
+function neonRoundRect(g: Graphics, x: number, y: number, w: number, h: number, r: number, cell: number, color: number): void {
+  for (const pass of tubePasses(cell, color)) g.roundRect(x, y, w, h, r).stroke(pass);
+}
+
+/**
+ * Neon flicker as GSAP array keyframes: [alpha, duration] pairs, each snapping to
+ * its value (ease steps(1) on EVERY keyframe). A single top-level ease would apply
+ * to the whole keyframe timeline instead and skip the dips entirely.
+ */
+function flicker(steps: readonly (readonly [number, number])[]): gsap.TweenVars[] {
+  return steps.map(([alpha, duration]) => ({ alpha, duration, ease: 'steps(1)' }));
+}
+
+function neonLine(g: Graphics, x1: number, x2: number, y: number, cell: number, color: number): void {
+  for (const pass of tubePasses(cell, color)) g.moveTo(x1, y).lineTo(x2, y).stroke({ ...pass, cap: 'round' });
+}
 
 /**
  * Pixi + GSAP presentation. It never decides anything: it is handed a Round
@@ -133,12 +162,33 @@ export class SlotScene {
       autoStart: false, // frames are driven by gsap.ticker (see constructor)
     });
     app.canvas.setAttribute('aria-hidden', 'true'); // the role="status" text is the accessible view
+    // The accessible UI is plain HTML (buttons + role="status"). On touch devices Pixi's
+    // AccessibilitySystem adds an invisible, focusable "enable accessibility" button —
+    // an empty Tab stop. Nothing in this canvas is accessible-enabled, so shut it down.
+    (app.renderer as unknown as { accessibility?: { destroy(): void } }).accessibility?.destroy();
     host.appendChild(app.canvas);
     return new SlotScene(app);
   }
 
   private requestRender(): void {
     this.dirty = true;
+  }
+
+  /**
+   * Neon sign switching on at page load: starts lit (so a throttled or hidden tab
+   * never shows an empty board), then two short dips. Skipped with reduced motion.
+   */
+  powerOn(): void {
+    if (!this.motionOn) return;
+    gsap.to(this.board, {
+      keyframes: flicker([
+        [1, 0.25],
+        [0.35, 0.06],
+        [1, 0.12],
+        [0.6, 0.06],
+        [1, 0.1],
+      ]),
+    });
   }
 
   /** Ambient idle motion on/off (prefers-reduced-motion). */
@@ -158,8 +208,10 @@ export class SlotScene {
         ),
       ];
     } else {
-      this.boardGlow.alpha = 0.7;
-      this.paylineIdle.alpha = 0.22;
+      this.boardGlow.alpha = IDLE.glowMax;
+      this.paylineIdle.alpha = IDLE.paylineIdleMax;
+      gsap.killTweensOf(this.board); // stop a power-on flicker in progress
+      this.board.alpha = 1;
       // Respect the preference immediately, even mid-round:
       if (this.activeSpin) this.skip(); // same stops, effects reset
       this.winLoop?.kill();
@@ -173,7 +225,6 @@ export class SlotScene {
         const scales = this.allIconScales();
         gsap.killTweensOf(scales);
         scales.forEach((s) => s.set(1));
-        this.glowRing.tint = PIXI_COLORS.white;
       }
     }
   }
@@ -207,61 +258,59 @@ export class SlotScene {
     );
     this.shadow.updateCacheTexture();
 
+    // Soft magenta halo around the sign (additive), breathing in the ambient loop.
     this.glowRing
       .clear()
-      .roundRect(-3, -3, boardW + 6, boardH + 6, radius + 3)
-      .stroke({ width: 6, color: PIXI_COLORS.glow, alpha: 0.28 })
-      .roundRect(-9, -9, boardW + 18, boardH + 18, radius + 9)
-      .stroke({ width: 12, color: PIXI_COLORS.glow, alpha: 0.08 });
+      .roundRect(-cell * 0.06, -cell * 0.06, boardW + cell * 0.12, boardH + cell * 0.12, radius + cell * 0.06)
+      .stroke({ width: cell * 0.3, color: PIXI_COLORS.magenta, alpha: 0.07 })
+      .roundRect(-cell * 0.02, -cell * 0.02, boardW + cell * 0.04, boardH + cell * 0.04, radius + cell * 0.02)
+      .stroke({ width: cell * 0.12, color: PIXI_COLORS.magenta, alpha: 0.12 });
 
+    // The sign: dark backplate, outer magenta tube, mounting screws.
     const p = this.panel.clear();
-    p.roundRect(0, 0, boardW, boardH, radius).fill(PANEL_GRAD).stroke({ width: 2, fill: NEON_GRAD, alignment: 1 });
-    p.roundRect(2, 2, boardW - 4, boardH * 0.45, radius).fill({ color: PIXI_COLORS.white, alpha: 0.04 });
+    p.roundRect(0, 0, boardW, boardH, radius).fill(PIXI_COLORS.plate);
+    neonRoundRect(p, 0, 0, boardW, boardH, radius, cell, PIXI_COLORS.magentaHot);
+    const screw = Math.max(2, cell * 0.025);
+    for (const [sx, sy] of [[pad * 0.5, pad * 0.5], [boardW - pad * 0.5, pad * 0.5], [pad * 0.5, boardH - pad * 0.5], [boardW - pad * 0.5, boardH - pad * 0.5]] as const) {
+      p.circle(sx, sy, screw).fill(0x2a2633);
+    }
 
     const s = this.shade.clear();
     this.reels.forEach((reel, i) => {
       const x = pad + i * (cell + gap);
-      p.roundRect(x, pad, cell, cell * 3, winR).fill(PIXI_COLORS.window).stroke({ width: 1, color: PIXI_COLORS.white, alpha: 0.06 });
+      p.roundRect(x, pad, cell, cell * 3, winR).fill(PIXI_COLORS.cell).stroke({ width: 1, color: PIXI_COLORS.white, alpha: 0.05 });
       // Depth fades: symbols recede into a cylinder instead of a hard cut.
       s.rect(x, pad, cell, cell * 0.55).fill(FADE_TOP);
       s.rect(x, pad + cell * 2.45, cell, cell * 0.55).fill(FADE_BOTTOM);
-      this.flashes[i]?.clear().roundRect(x, pad, cell, cell * 3, winR).fill(PIXI_COLORS.white);
+      this.flashes[i]?.clear().roundRect(x, pad, cell, cell * 3, winR).fill(PIXI_COLORS.cyanHot);
       reel.position.set(x + cell / 2, midY);
       reel.layout(cell);
     });
 
-    // Middle-line chevrons so players know which row pays (glow copy + solid).
-    const m = cell * 0.09;
-    const g = m * 1.6;
-    p.poly([2, midY - g, 2 + g, midY, 2, midY + g]).fill({ color: PIXI_COLORS.neonCyan, alpha: 0.3 });
-    p.poly([boardW - 2, midY - g, boardW - 2 - g, midY, boardW - 2, midY + g]).fill({ color: PIXI_COLORS.neonCyan, alpha: 0.3 });
-    p.poly([2, midY - m, 2 + m, midY, 2, midY + m]).fill(PIXI_COLORS.neonCyan);
-    p.poly([boardW - 2, midY - m, boardW - 2 - m, midY, boardW - 2, midY + m]).fill(PIXI_COLORS.neonCyan);
-
     const x2 = pad + 2 * (cell + gap);
-    this.anticipation
-      .clear()
-      .roundRect(x2 - 3, pad - 3, cell + 6, cell * 3 + 6, winR + 3)
-      .stroke({ width: 10, color: PIXI_COLORS.gold2, alpha: 0.2 })
-      .roundRect(x2 - 3, pad - 3, cell + 6, cell * 3 + 6, winR + 3)
-      .stroke({ width: 3, color: PIXI_COLORS.gold2 });
+    const a = this.anticipation.clear();
+    neonRoundRect(a, x2 - 3, pad - 3, cell + 6, cell * 3 + 6, winR + 3, cell, PIXI_COLORS.amber);
 
-    const lineX = pad * 0.5;
-    const lineW = boardW - pad;
-    this.paylineIdle
-      .clear()
-      .roundRect(lineX, midY - cell / 2, lineW, cell, winR)
-      .stroke({ width: Math.max(2, cell * 0.02), color: PIXI_COLORS.gold })
-      .rect(lineX, midY - 1, lineW, 2)
-      .fill({ color: PIXI_COLORS.gold, alpha: 0.5 });
-    this.paylineWin
-      .clear()
-      .roundRect(lineX, midY - cell / 2, lineW, cell, winR)
-      .stroke({ width: cell * 0.09, color: PIXI_COLORS.gold, alpha: 0.18 })
-      .roundRect(lineX, midY - cell / 2, lineW, cell, winR)
-      .stroke({ width: Math.max(3, cell * 0.035), color: PIXI_COLORS.gold })
-      .rect(lineX, midY - 1, lineW, 2)
-      .fill({ color: PIXI_COLORS.gold, alpha: 0.5 });
+    // Payline: two cyan tube rails framing the middle row, plus end chevrons.
+    const railX1 = pad * 0.6;
+    const railX2 = boardW - pad * 0.6;
+    const top = midY - cell / 2;
+    const bottom = midY + cell / 2;
+    const m = cell * 0.09;
+    const chevrons = (g: Graphics, color: number): void => {
+      g.poly([0, midY - m, m * 1.1, midY, 0, midY + m]).fill(color);
+      g.poly([boardW, midY - m, boardW - m * 1.1, midY, boardW, midY + m]).fill(color);
+    };
+    const idle = this.paylineIdle.clear();
+    neonLine(idle, railX1, railX2, top, cell * 0.7, PIXI_COLORS.cyan);
+    neonLine(idle, railX1, railX2, bottom, cell * 0.7, PIXI_COLORS.cyan);
+    chevrons(idle, PIXI_COLORS.cyan);
+    // Win state: a faint lit band + hotter, thicker rails.
+    const win = this.paylineWin.clear();
+    win.rect(railX1, top, railX2 - railX1, cell).fill({ color: PIXI_COLORS.cyan, alpha: 0.07 });
+    neonLine(win, railX1, railX2, top, cell * 1.2, PIXI_COLORS.cyanHot);
+    neonLine(win, railX1, railX2, bottom, cell * 1.2, PIXI_COLORS.cyanHot);
+    chevrons(win, PIXI_COLORS.cyanHot);
 
     // Sparks/sweep hold old pixel positions; payline + icon win state survive (alpha/scale only).
     if (this.winTimeline || this.winLoop) this.winFx.stop();
@@ -397,18 +446,29 @@ export class SlotScene {
       return;
     }
 
-    tl.fromTo(this.paylineWin, { alpha: 0.2 }, { alpha: 1, duration: 0.18, repeat: 3, yoyo: true, ease: 'sine.inOut' }, 0)
+    // Payline rails surge on (two slow pulses: well under 3 flashes per second).
+    tl.fromTo(this.paylineWin, { alpha: 0.2 }, { alpha: 1, duration: 0.25, repeat: 3, yoyo: true, ease: 'sine.inOut' }, 0)
       .set(this.paylineWin, { alpha: 1 })
       .to(scales, { x: 1.22, y: 1.22, duration: 0.35, ease: 'back.out(2.2)', stagger: 0.08 }, 0)
       .to(scales, { x: 1.1, y: 1.1, duration: 0.3, ease: 'power2.out' }, 0.6)
       .to(glows, { alpha: 0.9, duration: 0.3, stagger: 0.08 }, 0)
-      .set(this.glowRing, { tint: PIXI_COLORS.gold }, 0.5)
-      .to(this.glowRing, { alpha: 1, duration: 0.3, ease: 'power2.out' }, 0.5)
-      .set(this.glowRing, { tint: PIXI_COLORS.white }, 1.8);
+      // The sign "buzzes": its magenta halo stutters twice, like a tube on a tired transformer.
+      .to(
+        this.glowRing,
+        {
+          keyframes: flicker([
+            [0.35, 0.05],
+            [1, 0.07],
+            [0.55, 0.05],
+            [1, 0.1],
+          ]),
+        },
+        1.05, // after the payline pulses, so flashes stay spread out (WCAG 2.3.1: max 3 per second)
+      );
 
     const centres = this.reels.map((r) => ({ x: r.x, y: r.y })); // reel origin = middle-cell centre, board space
     const symbol = this.lastRound?.outcome.kind === 'win' ? this.lastRound.outcome.symbol : 'star';
-    this.winFx.addTo(tl, centres, this.geom, GLOW_TINT[symbol]);
+    this.winFx.addTo(tl, centres, this.geom, SYMBOL_TINT[symbol]);
 
     // After the burst, a calm breathing loop until the next spin.
     tl.eventCallback('onComplete', () => {
@@ -429,7 +489,6 @@ export class SlotScene {
     this.winFx.stop();
     this.paylineWin.alpha = 0;
     gsap.killTweensOf(this.glowRing);
-    this.glowRing.tint = PIXI_COLORS.white;
     this.glowRing.alpha = 1;
     const scales = this.allIconScales();
     gsap.killTweensOf(scales);

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Night Shift Reels — a compact three-reel browser game built with TypeScript, PixiJS and GSAP." />
-    <meta name="theme-color" content="#05061a" />
+    <meta name="theme-color" content="#050508" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <title>Night Shift Reels</title>
     <script>
@@ -13,14 +13,13 @@
     </script>
   </head>
   <body>
-    <div class="sky" aria-hidden="true">
-      <span class="aurora a1"></span><span class="aurora a2"></span><span class="aurora a3"></span>
-      <span class="stars s1"></span><span class="stars s2"></span><span class="shooting"></span>
-    </div>
+    <!-- Decorative city backdrop; main.ts fills in the skyline (src/view/skyline.ts). -->
+    <div id="city" class="city" aria-hidden="true"></div>
 
     <main class="app">
       <header class="header">
-        <h1>Night Shift Reels</h1>
+        <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Open all night · 03:12</p>
+        <h1>Night Shift <span>Reels</span></h1>
         <p class="tagline">Match three on the middle line. Free play, no money involved.</p>
       </header>
 

@@ -33,7 +33,7 @@ export class WinFx {
     };
     this.winGlows = Array.from({ length: ICONS }, () => make(glowTexture));
     this.sweep = make(glowTexture);
-    this.sweep.tint = PIXI_COLORS.goldPale;
+    this.sweep.tint = PIXI_COLORS.cyanHot;
     this.sparks = Array.from({ length: ICONS * SPARKS_PER_ICON }, () => {
       const s = make(sparkTexture);
       s.visible = false;
@@ -54,7 +54,7 @@ export class WinFx {
       const at = 0.1 + j * 0.08;
       const s0 = (g.cell * 1.7) / glow.texture.width;
       glow.position.set(c.x, c.y);
-      glow.tint = PIXI_COLORS.gold;
+      glow.tint = symbolTint; // halo in the winning tube colour
       tl.fromTo(glow, { alpha: 0 }, { alpha: 0.55, duration: 0.5, ease: 'power2.out' }, at).fromTo(
         glow.scale,
         { x: s0 * 0.6, y: s0 * 0.6 },
