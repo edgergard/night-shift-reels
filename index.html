@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Night Shift Reels — a compact three-reel browser game built with TypeScript, PixiJS and GSAP." />
+    <meta name="theme-color" content="#05061a" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <title>Night Shift Reels</title>
+  </head>
+  <body>
+    <div class="sky" aria-hidden="true">
+      <span class="aurora a1"></span><span class="aurora a2"></span><span class="aurora a3"></span>
+      <span class="stars s1"></span><span class="stars s2"></span><span class="shooting"></span>
+    </div>
+
+    <main class="app">
+      <header class="header">
+        <h1>Night Shift Reels</h1>
+        <p class="tagline">Match three on the middle line. Free play, no money involved.</p>
+      </header>
+
+      <div id="stage" class="stage" data-phase="idle">
+        <div id="win-banner" class="win-banner" aria-hidden="true"></div>
+      </div>
+
+      <section class="hud" aria-label="Game controls">
+        <div id="status" class="status" role="status" aria-live="polite" aria-atomic="true">
+          <p id="status-title" class="status-title">Ready</p>
+          <p id="status-detail" class="status-detail">Press Spin to play a free round.</p>
+        </div>
+        <div class="controls">
+          <button id="spin" class="btn btn-primary" type="button">Spin</button>
+          <button id="skip" class="btn btn-secondary" type="button" disabled>Skip animation</button>
+          <button id="demo" class="btn btn-secondary btn-demo" type="button">Show a win <span class="badge">demo</span></button>
+        </div>
+        <p class="hint">Keyboard: <kbd>Space</kbd> spins or skips · <kbd>Tab</kbd> moves between buttons.</p>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
